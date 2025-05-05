@@ -48,7 +48,7 @@ response_var = "Lower_Staffing"
 original_var = "Adjusted Total Nurse Staffing Hours per Resident per Day"
 
 # Set lower staffing cutoff:
-cutoff = 0 # try three levels? lowered, stayed the same, went up?
+cutoff = -0.7 # try three levels? lowered, stayed the same, went up?
 
 # Encode the float64 footnotes in the new dataset as strings
 # List of column names to convert
@@ -331,11 +331,11 @@ def generate_features(df):
     df['short_stay_quality_rating_5'] = np.where(df['Short-Stay QM Rating']==5,1,0)
     
     # 5 star staffing rating ############ obvious - remove later
-    df['staffing_rating_1'] = np.where(df['Staffing Rating']==1,1,0)
-    df['staffing_rating_2'] = np.where(df['Staffing Rating']==2,1,0)
-    df['staffing_rating_3'] = np.where(df['Staffing Rating']==3,1,0)
-    df['staffing_rating_4'] = np.where(df['Staffing Rating']==4,1,0)
-    df['staffing_rating_5'] = np.where(df['Staffing Rating']==5,1,0)
+    #df['staffing_rating_1'] = np.where(df['Staffing Rating']==1,1,0)
+    #df['staffing_rating_2'] = np.where(df['Staffing Rating']==2,1,0)
+    #df['staffing_rating_3'] = np.where(df['Staffing Rating']==3,1,0)
+    #df['staffing_rating_4'] = np.where(df['Staffing Rating']==4,1,0)
+    #df['staffing_rating_5'] = np.where(df['Staffing Rating']==5,1,0)
     
     # Average dollar amount per fine (severity of fines)
     df['dollars_per_fine_count'] = np.where(df['Number of Fines']!=0, df['Total Amount of Fines in Dollars']/df['Number of Fines'], 0)
@@ -353,10 +353,10 @@ all_dat = generate_features(all_dat)
 model_vars = set([
     #"Number of Certified Beds"
     #,"Average Number of Residents per Day" #### highly correlated with beds
-    #,'avg_daily_residents_per_bed_ratio'
-    #,'Total nursing staff turnover'
-    #,'Registered Nurse turnover'
-    'Number of administrators who have left the nursing home'
+    'avg_daily_residents_per_bed_ratio'
+   #,'Total nursing staff turnover'
+   #,'Registered Nurse turnover'
+    ,'Number of administrators who have left the nursing home'
     
     ,'Rating Cycle 1 Total Number of Health Deficiencies'
     ,'Rating Cycle 1 Number of Standard Health Deficiencies'
@@ -400,10 +400,10 @@ model_vars = set([
 [c for c in all_dat if "MOST_RECENT_HEALTH_INSPECTION" in c.upper()] + \
 [c for c in all_dat if "COUNCIL_" in c.upper()] + \
 [c for c in all_dat if "SPRINKLERS_" in c.upper()] + \
-[c for c in all_dat if "FIVE_STAR_" in c.upper()] + \
+#[c for c in all_dat if "FIVE_STAR_" in c.upper()] + \
 [c for c in all_dat if "HEALTH_INSPECTION_RATING_" in c.upper()] + \
-[c for c in all_dat if "QUALITY_RATING_" in c.upper()] + \
-[c for c in all_dat if "STAFFING_RATING_" in c.upper()] + \
+#[c for c in all_dat if "QUALITY_RATING_" in c.upper()] + \
+#[c for c in all_dat if "STAFFING_RATING_" in c.upper()] + \
 [c for c in all_dat if c in post_health_citations['Scope Severity Code'].unique()] + \
 #[c for c in all_dat if c in post_health_citations['Deficiency Category'].unique()] + \
 [c for c in all_dat if c in post_health_citations['Deficiency Tag Number'].unique()] + \
@@ -418,18 +418,25 @@ model_vars.remove('months_since_approval_prev')
 #all_dat = all_dat.loc[all_dat['months_since_approval_prev'] >= 36]
 
 # Drop facilities that had very little staffing change
-all_dat = all_dat.loc[(all_dat[response_var + "_CALC"] > cutoff) | (all_dat[response_var + "_CALC"] <= cutoff)]
+all_dat = all_dat.loc[(all_dat[response_var + "_CALC"] <= cutoff) | (all_dat[response_var + "_CALC"] >= (cutoff*-1))]
 all_dat = all_dat.reset_index(drop=True)
+
+print("Number of facilities in dataset:")
+print(len(all_dat))
 
 # Train test split
 # Split dataset into training and test sets
-X_train, X_test, y_train, y_test = train_test_split(all_dat[list(model_vars)], all_dat[response_var], test_size=0.33, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(all_dat[list(model_vars)]
+                                                    , all_dat[response_var]
+                                                    , test_size=0.33
+                                                    , random_state=42
+                                                    )
 
 # Create the LightGBM classifier
 lgb_model = lgbm.LGBMClassifier(boosting_type='gbdt'
                                 , num_threads=4
                                 , class_weight='balanced'
-                                , learning_rate=0.05
+                                , learning_rate=0.001
                                 , num_leaves=31
                                 #, lambda_l2=1.0
                                 )
@@ -544,13 +551,19 @@ with open('correlated_pairs.csv', mode='w', newline='') as file:
 ###################### GBM important features
 # Plot feature importance
 plt.figure(figsize=(16, 12))  # Adjust plot size
-plot_importance(lgb_model, max_num_features=len(model_vars), importance_type='gain', figsize=(16, 12))
+importance = plot_importance(lgb_model, max_num_features=len(model_vars), importance_type='gain', figsize=(16, 12))
 plt.title("Feature Importance - LightGBM")
+plt.show(importance)
+
+importance = pd.DataFrame({"Feature": list(model_vars), "Importance": lgb_model.feature_importances_})
+importance = importance.sort_values(by="Importance", ascending=False)
+
+top_features = importance["Feature"].head(20).tolist()
+top_features.append(response_var)
+corr_matrix = all_dat[top_features].corr()
+plt.figure(figsize=(16, 12))
+sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f")
 plt.show()
-
-
-
-
 
 
 ####################### Shapley values
