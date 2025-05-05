@@ -48,7 +48,7 @@ response_var = "Lower_Staffing"
 original_var = "Adjusted Total Nurse Staffing Hours per Resident per Day"
 
 # Set lower staffing cutoff:
-cutoff = -0.7 # try three levels? lowered, stayed the same, went up?
+cutoff = -1.0 # try three levels? lowered, stayed the same, went up?
 
 # Encode the float64 footnotes in the new dataset as strings
 # List of column names to convert
@@ -219,10 +219,6 @@ all_dat[response_var + "_CALC"] = all_dat[original_var] - all_dat["PREV "+origin
 all_dat = all_dat.dropna(subset=[response_var+"_CALC"])
 all_dat = all_dat.reset_index(drop=True)
 
-# Create a histogram of the target variable
-hist_target = px.histogram(all_dat[response_var + "_CALC"])
-hist_target.write_html("hist_target_images/hist_target.html")
-
 # Choose a cutoff to create a 0/1 binary response variable
 all_dat[response_var] = np.where(all_dat[f"{response_var}_CALC"] < cutoff, 1, 0)
 
@@ -331,11 +327,11 @@ def generate_features(df):
     df['short_stay_quality_rating_5'] = np.where(df['Short-Stay QM Rating']==5,1,0)
     
     # 5 star staffing rating ############ obvious - remove later
-    #df['staffing_rating_1'] = np.where(df['Staffing Rating']==1,1,0)
-    #df['staffing_rating_2'] = np.where(df['Staffing Rating']==2,1,0)
-    #df['staffing_rating_3'] = np.where(df['Staffing Rating']==3,1,0)
-    #df['staffing_rating_4'] = np.where(df['Staffing Rating']==4,1,0)
-    #df['staffing_rating_5'] = np.where(df['Staffing Rating']==5,1,0)
+    df['staffing_rating_1'] = np.where(df['Staffing Rating']==1,1,0)
+    df['staffing_rating_2'] = np.where(df['Staffing Rating']==2,1,0)
+    df['staffing_rating_3'] = np.where(df['Staffing Rating']==3,1,0)
+    df['staffing_rating_4'] = np.where(df['Staffing Rating']==4,1,0)
+    df['staffing_rating_5'] = np.where(df['Staffing Rating']==5,1,0)
     
     # Average dollar amount per fine (severity of fines)
     df['dollars_per_fine_count'] = np.where(df['Number of Fines']!=0, df['Total Amount of Fines in Dollars']/df['Number of Fines'], 0)
@@ -351,11 +347,11 @@ all_dat = generate_features(all_dat)
 
 # Select variables for model training
 model_vars = set([
-    #"Number of Certified Beds"
-    #,"Average Number of Residents per Day" #### highly correlated with beds
-    'avg_daily_residents_per_bed_ratio'
-   #,'Total nursing staff turnover'
-   #,'Registered Nurse turnover'
+    "Number of Certified Beds"
+    ,"Average Number of Residents per Day" #### highly correlated with beds
+    ,'avg_daily_residents_per_bed_ratio'
+    ,'Total nursing staff turnover'
+    ,'Registered Nurse turnover'
     ,'Number of administrators who have left the nursing home'
     
     ,'Rating Cycle 1 Total Number of Health Deficiencies'
@@ -400,10 +396,10 @@ model_vars = set([
 [c for c in all_dat if "MOST_RECENT_HEALTH_INSPECTION" in c.upper()] + \
 [c for c in all_dat if "COUNCIL_" in c.upper()] + \
 [c for c in all_dat if "SPRINKLERS_" in c.upper()] + \
-#[c for c in all_dat if "FIVE_STAR_" in c.upper()] + \
+[c for c in all_dat if "FIVE_STAR_" in c.upper()] + \
 [c for c in all_dat if "HEALTH_INSPECTION_RATING_" in c.upper()] + \
-#[c for c in all_dat if "QUALITY_RATING_" in c.upper()] + \
-#[c for c in all_dat if "STAFFING_RATING_" in c.upper()] + \
+[c for c in all_dat if "QUALITY_RATING_" in c.upper()] + \
+[c for c in all_dat if "STAFFING_RATING_" in c.upper()] + \
 [c for c in all_dat if c in post_health_citations['Scope Severity Code'].unique()] + \
 #[c for c in all_dat if c in post_health_citations['Deficiency Category'].unique()] + \
 [c for c in all_dat if c in post_health_citations['Deficiency Tag Number'].unique()] + \
@@ -413,6 +409,7 @@ model_vars = set([
     
 # Pop any variables not helping prediction
 model_vars.remove('months_since_approval_prev')
+#model_vars.remove('mds_quality_code_408')
 
 # Drop facilities that were new in 2018
 #all_dat = all_dat.loc[all_dat['months_since_approval_prev'] >= 36]
@@ -423,6 +420,14 @@ all_dat = all_dat.reset_index(drop=True)
 
 print("Number of facilities in dataset:")
 print(len(all_dat))
+
+# Create a histogram of the target variable
+hist_target = px.histogram(all_dat
+                           ,response_var + "_CALC"
+                           ,color="Lower_Staffing"
+                           ,color_discrete_sequence=px.colors.qualitative.Set1
+                           )
+hist_target.write_html("hist_target_images/hist_target.html")
 
 # Train test split
 # Split dataset into training and test sets
@@ -596,15 +601,58 @@ fn = X_test.loc[(X_test['prediction']==0) & (X_test[response_var]==1)]
 
 
 
-#px.scatter(all_dat, 'mds_quality_code_408', response_var+"_CALC").write_html("qual_code_408_scatter.html")
+px.scatter(all_dat
+           , 'mds_quality_code_408'
+           , response_var+"_CALC"
+           , color=response_var
+           ).write_html("qual_code_408_scatter.html")
 
-#px.scatter(all_dat, 'mds_quality_code_401', response_var+"_CALC").write_html("qual_code_401_scatter.html")
+px.scatter(all_dat
+           , 'mds_quality_code_401'
+           , response_var+"_CALC"
+           , color=response_var
+           ).write_html("qual_code_401_scatter.html")
+px.scatter(all_dat
+           , 'mds_quality_code_480'
+           , response_var+"_CALC"
+           , color=response_var
+           ).write_html("qual_code_480_scatter.html")
+
+px.scatter(all_dat
+           , 'claims_quality_code_521'
+           , response_var+"_CALC"
+           , color=response_var
+           ).write_html("claims_code_521_scatter.html")
+px.scatter(all_dat
+           , 'claims_quality_code_522'
+           , response_var+"_CALC"
+           , color=response_var
+           ).write_html("claims_code_522_scatter.html")
+px.scatter(all_dat
+           , 'avg_daily_residents_per_bed_ratio'
+           , response_var+"_CALC"
+           , color=response_var
+           ).write_html("residents_per_bed_scatter.html")
 
 
 #px.box(all_dat, response_var, 'mds_quality_code_408').write_html("qual_code_408_box.html")
 
 
-px.box(all_dat, "ownership_for_profit_llc", response_var + "_CALC").write_html("llc_box.html")
+px.box(all_dat, "ownership_for_profit_llc"
+       , response_var + "_CALC"
+       ).write_html("llc_box.html")
+px.box(all_dat, response_var
+       , "mds_quality_code_408"
+       ).write_html("mds_quality_code_408_box.html")
+px.box(all_dat, response_var
+       , "mds_quality_code_401"
+       ).write_html("mds_quality_code_401_box.html")
+px.box(all_dat, response_var
+       , "mds_quality_code_480"
+       ).write_html("mds_quality_code_480_box.html")
+px.box(all_dat, response_var
+       , "claims_quality_code_521"
+       ).write_html("claims_quality_code_521_box.html")
 
 
 
