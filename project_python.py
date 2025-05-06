@@ -347,11 +347,11 @@ all_dat = generate_features(all_dat)
 
 # Select variables for model training
 model_vars = set([
-    "Number of Certified Beds"
-    ,"Average Number of Residents per Day" #### highly correlated with beds
-    ,'avg_daily_residents_per_bed_ratio'
-    ,'Total nursing staff turnover'
-    ,'Registered Nurse turnover'
+    #"Number of Certified Beds"
+    #,"Average Number of Residents per Day" #### highly correlated with beds
+    'avg_daily_residents_per_bed_ratio'
+    #,'Total nursing staff turnover'
+    #,'Registered Nurse turnover'
     ,'Number of administrators who have left the nursing home'
     
     ,'Rating Cycle 1 Total Number of Health Deficiencies'
@@ -396,10 +396,10 @@ model_vars = set([
 [c for c in all_dat if "MOST_RECENT_HEALTH_INSPECTION" in c.upper()] + \
 [c for c in all_dat if "COUNCIL_" in c.upper()] + \
 [c for c in all_dat if "SPRINKLERS_" in c.upper()] + \
-[c for c in all_dat if "FIVE_STAR_" in c.upper()] + \
+#[c for c in all_dat if "FIVE_STAR_" in c.upper()] + \
 [c for c in all_dat if "HEALTH_INSPECTION_RATING_" in c.upper()] + \
-[c for c in all_dat if "QUALITY_RATING_" in c.upper()] + \
-[c for c in all_dat if "STAFFING_RATING_" in c.upper()] + \
+#[c for c in all_dat if "QUALITY_RATING_" in c.upper()] + \
+#[c for c in all_dat if "STAFFING_RATING_" in c.upper()] + \
 [c for c in all_dat if c in post_health_citations['Scope Severity Code'].unique()] + \
 #[c for c in all_dat if c in post_health_citations['Deficiency Category'].unique()] + \
 [c for c in all_dat if c in post_health_citations['Deficiency Tag Number'].unique()] + \
@@ -641,8 +641,10 @@ px.scatter(all_dat
 px.box(all_dat, "ownership_for_profit_llc"
        , response_var + "_CALC"
        ).write_html("llc_box.html")
-px.box(all_dat, response_var
+px.box(all_dat
+       , response_var
        , "mds_quality_code_408"
+       , color="Lower_Staffing"
        ).write_html("mds_quality_code_408_box.html")
 px.box(all_dat, response_var
        , "mds_quality_code_401"
@@ -650,6 +652,9 @@ px.box(all_dat, response_var
 px.box(all_dat, response_var
        , "mds_quality_code_480"
        ).write_html("mds_quality_code_480_box.html")
+px.box(all_dat, response_var
+       , "mds_quality_code_479"
+       ).write_html("mds_quality_code_479_box.html")
 px.box(all_dat, response_var
        , "claims_quality_code_521"
        ).write_html("claims_quality_code_521_box.html")
